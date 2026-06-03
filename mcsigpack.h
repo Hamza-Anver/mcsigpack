@@ -41,10 +41,10 @@
 #define MCSIGPACK_CHUNK_SECS 5
 
 #define MCSIGPACK_CHANNEL_LIST      \
-    X(MCSIGPACK_CH_EEG1, 0, 250, 1, 7) \
-    X(MCSIGPACK_CH_EEG2, 1, 250, 1, 7) \
-    X(MCSIGPACK_CH_ECG,  2, 250, 1, 7) \
-    X(MCSIGPACK_CH_IMU,  3,  20, 3, 7)
+    X(MCSIGPACK_CH_EEG1, 0, 250, 1, 4) \
+    X(MCSIGPACK_CH_EEG2, 1, 250, 1, 4) \
+    X(MCSIGPACK_CH_ECG,  2, 250, 1, 4) \
+    X(MCSIGPACK_CH_IMU,  3,  20, 3, 4)
 #define X(name, wire, hz, axes, max_shift)
 MCSIGPACK_CHANNEL_LIST
 #undef X

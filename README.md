@@ -34,6 +34,17 @@ Measured on 5s of synthetic biosignals at 247-byte MTU:
 
 About 1.9x is the ceiling for this approach since you are going from 16-bit samples down to 8-bit deltas. Adding entropy coding (Rice/Golomb) on top of the deltas would push this further.
 
+### Shift Factor Impact
+
+Measured by setting the same max shift on every channel.
+
+| Channel | Ratio @ 0 | MAE @ 0 | Ratio @ 7 | MAE @ 7 |
+|---|---:|---:|---:|---:|
+| EEG1 | 1.55x | 0.00 (0.0%) | 1.88x | 9.99 (4.6%) |
+| EEG2 | 1.07x | 0.00 (0.0%) | 1.88x | 18.66 (8.5%) |
+| ECG | 1.80x | 0.00 (0.0%) | 1.88x | 1.99 (0.9%) |
+| IMU | 0.86x | 0.00 (0.0%) | 1.90x | 22.57 (7.7%) |
+
 ## Usage
 
 Define your channels in `mcsigpack.h`:
