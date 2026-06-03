@@ -1,0 +1,6 @@
+config SIGPACK
+    bool "mcsigpack biosignal compression library"
+    help
+      Multichannel delta compression for BLE biosignal streaming.
+      Pure C99. No Zephyr dependencies in the core implementation.
+      Configure channels in include/mcsigpack.h via MCSIGPACK_CHANNEL_LIST.

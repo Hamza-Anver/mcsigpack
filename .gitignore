@@ -1,0 +1,25 @@
+# build output
+out/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# generated test data (regenerate with tools/gen_dummy_data.py)
+test/dummy_data.h
