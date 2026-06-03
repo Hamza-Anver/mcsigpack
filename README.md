@@ -40,11 +40,11 @@ Define your channels in `mcsigpack.h`:
 
 ```c
 #define MCSIGPACK_CHANNEL_LIST       \
-    X(MCSIGPACK_CH_EEG1, 0, 250, 1) \
-    X(MCSIGPACK_CH_EEG2, 1, 250, 1) \
-    X(MCSIGPACK_CH_ECG,  2, 250, 1) \
-    X(MCSIGPACK_CH_IMU,  3,  20, 3)
-//   enum name, wire ID, Hz, axes
+    X(MCSIGPACK_CH_EEG1, 0, 250, 1, 7) \
+    X(MCSIGPACK_CH_EEG2, 1, 250, 1, 7) \
+    X(MCSIGPACK_CH_ECG,  2, 250, 1, 7) \
+    X(MCSIGPACK_CH_IMU,  3,  20, 3, 7)
+//   enum name, wire ID, Hz, axes, max_shift
 ```
 
 Then initialise and push samples:

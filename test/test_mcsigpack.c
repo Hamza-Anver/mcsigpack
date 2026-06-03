@@ -112,13 +112,13 @@ static int bytes_for_channel(const capture_t *cap, uint8_t wire_id)
  * Shared helpers
  * ---------------------------------------------------------------------- */
 static const int k_axes[MCSIGPACK_NUM_CHANNELS] = {
-#define X(name, wire, hz, axes) (axes),
+#define X(name, wire, hz, axes, max_shift) (axes),
     MCSIGPACK_CHANNEL_LIST
 #undef X
 };
 
 static const int k_hz[MCSIGPACK_NUM_CHANNELS] = {
-#define X(name, wire, hz, axes) (hz),
+#define X(name, wire, hz, axes, max_shift) (hz),
     MCSIGPACK_CHANNEL_LIST
 #undef X
 };

@@ -4,19 +4,25 @@
 
 /* Channel config tables derived from MCSIGPACK_CHANNEL_LIST. */
 static const uint8_t k_wire_id[MCSIGPACK_NUM_CHANNELS] = {
-#define X(name, wire, hz, axes) (wire),
+#define X(name, wire, hz, axes, max_shift) (wire),
     MCSIGPACK_CHANNEL_LIST
 #undef X
 };
 
 static const uint8_t k_n_axes[MCSIGPACK_NUM_CHANNELS] = {
-#define X(name, wire, hz, axes) (axes),
+#define X(name, wire, hz, axes, max_shift) (axes),
+    MCSIGPACK_CHANNEL_LIST
+#undef X
+};
+
+static const uint8_t k_max_shift[MCSIGPACK_NUM_CHANNELS] = {
+#define X(name, wire, hz, axes, max_shift) (max_shift),
     MCSIGPACK_CHANNEL_LIST
 #undef X
 };
 
 static const uint16_t k_chunk_samples[MCSIGPACK_NUM_CHANNELS] = {
-#define X(name, wire, hz, axes) ((uint16_t)((hz) * MCSIGPACK_CHUNK_SECS)),
+#define X(name, wire, hz, axes, max_shift) ((uint16_t)((hz) * MCSIGPACK_CHUNK_SECS)),
     MCSIGPACK_CHANNEL_LIST
 #undef X
 };
@@ -36,7 +42,7 @@ static const uint16_t k_chunk_samples[MCSIGPACK_NUM_CHANNELS] = {
  */
 static int encode_block(
     const int16_t samples[][MCSIGPACK_MAX_AXES],
-    int count, int n_axes,
+    int count, int n_axes, uint8_t max_shift,
     uint8_t *out, int out_max,
     int *overflow_at)
 {
@@ -56,15 +62,15 @@ static int encode_block(
     }
 
     uint8_t shift = 0;
-    while (shift < 7 && (max_abs >> shift) > 127) shift++;
+    while (shift < max_shift && (max_abs >> shift) > 127) shift++;
 
     if ((max_abs >> shift) > 127) {
-        /* Still overflows at shift=7 — find the split point. */
+        /* Still overflows at the configured max shift — find the split point. */
         for (int s = 1; s < count; s++) {
             for (int a = 0; a < n_axes; a++) {
                 int32_t d = (int32_t)samples[s][a] - (int32_t)samples[s-1][a];
                 int32_t ad = d < 0 ? -d : d;
-                if ((ad >> 7) > 127) {
+                if ((ad >> max_shift) > 127) {
                     *overflow_at = s;
                     delta_count  = s - 1;
                     count        = s;
@@ -115,7 +121,7 @@ static int encode_channel(mcsigpack_ch_state_t *ch, uint8_t *out, int out_max)
         int overflow_at = -1;
         int bytes = encode_block(
             (const int16_t (*)[MCSIGPACK_MAX_AXES])&ch->buf[src],
-            count, ch->n_axes,
+            count, ch->n_axes, ch->max_shift,
             out + written, out_max - written,
             &overflow_at);
 
@@ -200,6 +206,7 @@ int mcsigpack_init(mcsigpack_ctx_t *ctx, mcsigpack_output_fn output_fn, void *us
     for (int i = 0; i < MCSIGPACK_NUM_CHANNELS; i++) {
         ctx->ch[i].wire_id       = k_wire_id[i];
         ctx->ch[i].n_axes        = k_n_axes[i];
+        ctx->ch[i].max_shift     = k_max_shift[i];
         ctx->ch[i].chunk_samples = k_chunk_samples[i];
         ctx->ch[i].remaining     = k_chunk_samples[i];
     }

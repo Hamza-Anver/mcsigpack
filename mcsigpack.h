@@ -32,23 +32,27 @@
  * Edit MCSIGPACK_CHANNEL_LIST to add/remove channels. Everything else derives
  * from this table automatically — enums, buffer sizes, chunk counters.
  *
- * Column order: X(enum_name, wire_id, hz, n_axes)
+ * Column order: X(enum_name, wire_id, hz, n_axes, max_shift)
  *   - wire_id : 0-255, written into the packet channel byte
  *   - hz      : sample rate in Hz
  *   - n_axes  : samples per frame (e.g. 1 for ECG/EEG, 3 for IMU)
+ *   - max_shift : 0-7, maximum right-shift permitted for this channel
  */
 #define MCSIGPACK_CHUNK_SECS 5
 
 #define MCSIGPACK_CHANNEL_LIST      \
-    X(MCSIGPACK_CH_EEG1, 0, 250, 1) \
-    X(MCSIGPACK_CH_EEG2, 1, 250, 1) \
-    X(MCSIGPACK_CH_ECG,  2, 250, 1) \
-    X(MCSIGPACK_CH_IMU,  3,  20, 3)
+    X(MCSIGPACK_CH_EEG1, 0, 250, 1, 7) \
+    X(MCSIGPACK_CH_EEG2, 1, 250, 1, 7) \
+    X(MCSIGPACK_CH_ECG,  2, 250, 1, 7) \
+    X(MCSIGPACK_CH_IMU,  3,  20, 3, 7)
+#define X(name, wire, hz, axes, max_shift)
+MCSIGPACK_CHANNEL_LIST
+#undef X
 /** @} */
 
 /** Channel enum — auto-generated from MCSIGPACK_CHANNEL_LIST. */
 typedef enum {
-#define X(name, wire, hz, axes) name,
+#define X(name, wire, hz, axes, max_shift) name,
     MCSIGPACK_CHANNEL_LIST
 #undef X
     MCSIGPACK_NUM_CHANNELS
@@ -100,6 +104,7 @@ typedef void (*mcsigpack_output_fn)(const mcsigpack_packet_t *packet, void *user
 typedef struct {
     uint8_t  wire_id;
     uint8_t  n_axes;
+    uint8_t  max_shift;
     uint16_t chunk_samples;
     int16_t  buf[MCSIGPACK_MAX_CHUNK_SAMPLES][MCSIGPACK_MAX_AXES];
     uint16_t buf_head;
