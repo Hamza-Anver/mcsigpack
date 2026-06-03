@@ -101,6 +101,14 @@ To regenerate the biosignal test vectors (requires `neurokit2` and `numpy`):
 python3 tools/gen_dummy_data.py > test/dummy_data.h
 ```
 
+To test the example Python decompressor against the C harness output:
+
+```bash
+python3 tools/test_mcsigpack_decompress.py
+```
+
+The script runs the C harness in `--dump` mode, captures the compressed packet stream, and decodes the concatenated per-channel payloads back into absolute samples.
+
 ## Structure
 
 ```
@@ -113,6 +121,8 @@ mcsigpack/
 │   ├── dummy_data.h
 │   └── test_mcsigpack.c
 ├── tools
+│   ├── mcsigpack_decompress.py
+│   ├── test_mcsigpack_decompress.py
 │   └── gen_dummy_data.py
 └── zephyr
     ├── CMakeLists.txt

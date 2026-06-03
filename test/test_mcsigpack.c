@@ -1,8 +1,11 @@
 /**
- * test_mcsigpack.c — unit tests and compression benchmarks
+ * test_mcsigpack.c — unit tests, compression benchmarks, and packet export
  *
  * Build:  make test
  * Run:    ./out/test_mcsigpack
+ *
+ * Export encoded packet fixtures for the Python example:
+ *   ./out/test_mcsigpack --dump /tmp/mcsigpack_packets.bin
  *
  * Regenerate biosignal test vectors (any duration):
  *   python3 tools/gen_dummy_data.py > test/dummy_data.h
@@ -13,6 +16,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+
+#define DUMP_MAGIC   "MCPK"
+#define DUMP_VERSION 1
 
 /* -------------------------------------------------------------------------
  * Consistency checks between dummy_data.h and mcsigpack.h
@@ -51,6 +57,46 @@ static void on_packet(const mcsigpack_packet_t *pkt, void *ud)
     capture_t *c = (capture_t *)ud;
     if (c->count < MAX_PKTS) c->pkts[c->count++] = *pkt;
     else                     c->overflow++;
+}
+
+typedef struct {
+    FILE *fp;
+    int   error;
+} dump_t;
+
+static void feed_all_data(mcsigpack_ctx_t *ctx);
+
+/** Write one packet record to the fixture stream. */
+static void dump_packet(const mcsigpack_packet_t *pkt, void *ud)
+{
+    dump_t *dump = (dump_t *)ud;
+    uint8_t hdr[3] = { pkt->channel_id, pkt->seq_num, pkt->payload_len };
+
+    if (dump->error) return;
+    if (fwrite(hdr, 1, sizeof(hdr), dump->fp) != sizeof(hdr)) dump->error = 1;
+    if (!dump->error && fwrite(pkt->payload, 1, pkt->payload_len, dump->fp) != pkt->payload_len)
+        dump->error = 1;
+}
+
+/** Dump a deterministic packet fixture for external decoder tests. */
+static int dump_packets(const char *path)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp) return 1;
+
+    if (fwrite(DUMP_MAGIC, 1, 4, fp) != 4 || fputc(DUMP_VERSION, fp) == EOF) {
+        fclose(fp);
+        return 1;
+    }
+
+    mcsigpack_ctx_t ctx;
+    dump_t dump = { fp, 0 };
+    mcsigpack_init(&ctx, dump_packet, &dump);
+    feed_all_data(&ctx);
+
+    if (fflush(fp) != 0) dump.error = 1;
+    fclose(fp);
+    return dump.error ? 1 : 0;
 }
 
 static int bytes_for_channel(const capture_t *cap, uint8_t wire_id)
@@ -437,8 +483,16 @@ static void bench_sequence_continuity(void)
 /* =========================================================================
  * Main
  * ====================================================================== */
-int main(void)
+int main(int argc, char **argv)
 {
+    if (argc == 3 && strcmp(argv[1], "--dump") == 0)
+        return dump_packets(argv[2]);
+
+    if (argc != 1) {
+        fprintf(stderr, "usage: %s [--dump path]\n", argv[0]);
+        return 1;
+    }
+
     printf("mcsigpack — %d channels  chunk=%ds  MTU=%dB\n",
            MCSIGPACK_NUM_CHANNELS, MCSIGPACK_CHUNK_SECS, MCSIGPACK_MTU);
 
