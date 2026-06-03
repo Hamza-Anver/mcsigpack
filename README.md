@@ -1,33 +1,42 @@
 # mcsigpack
 
-Multichannel biosignal compression for BLE streaming. Compresses ECG, EEG, and IMU data using adaptive delta encoding before transmission over BLE GATT.
+Multichannel biosignal compression for BLE streaming. Takes raw ECG, EEG, and IMU samples and packs them into BLE GATT packets using delta encoding.
 
-- Pure C99 — no RTOS or heap dependency
-- Drop-in Zephyr module via west
-- Output injected via callback — works with any queue or transport
+Pure C99. No RTOS or heap dependency. Works standalone or as a Zephyr module.
 
 ## How it works
 
-Samples are buffered per channel until all channels complete a chunk (default 5 s). The chunk is then encoded as a series of blocks: each block stores one absolute anchor sample followed by up to 31 right-shifted 8-bit deltas. The shift factor is chosen per block to keep all deltas in range. Encoded bytes are split into 247-byte BLE MTU packets and handed to the output callback.
+Samples are collected per channel until every channel has filled its chunk window (default 5s). At that point the chunk is encoded and handed off.
+
+Each chunk is encoded as a series of blocks:
+
+| Field | Size | Description |
+|---|---|---|
+| Header | 1 byte | Top 3 bits: shift factor (0-7). Bottom 5 bits: delta count (0-31) |
+| Anchor | n_axes x 2 bytes | Absolute sample value, int16 little-endian |
+| Deltas | delta_count x n_axes bytes | Difference from previous sample, right-shifted to fit int8 |
+
+The shift factor is chosen per block to be the smallest value that fits the largest delta into 8 bits. If a spike is too large even at shift=7 (QRS complexes in ECG, for example), the block is cut short and a fresh anchor is injected. No data is lost.
+
+Encoded blocks are split into 247-byte MTU packets with a 2-byte header (channel ID + sequence number) and passed to the output callback.
 
 ## Compression results
 
-Measured on 5 s of synthetic biosignals (250 Hz EEG/ECG, 20 Hz IMU, 247-byte MTU):
+Measured on 5s of synthetic biosignals at 247-byte MTU:
 
-```
-channel   raw        encoded    ratio
-EEG1      2500 B     1330 B     1.88x
-EEG2      2500 B     1330 B     1.88x
-ECG       2500 B     1330 B     1.88x
-IMU        600 B      316 B     1.90x
-total     8100 B     4306 B     1.88x
-```
+| Channel | Raw | Encoded | Ratio |
+|---|---|---|---|
+| EEG1 (250 Hz) | 2500 B | 1330 B | 1.88x |
+| EEG2 (250 Hz) | 2500 B | 1330 B | 1.88x |
+| ECG (250 Hz) | 2500 B | 1330 B | 1.88x |
+| IMU (20 Hz, 3-axis) | 600 B | 316 B | 1.90x |
+| **Total** | **8100 B** | **4306 B** | **1.88x** |
 
-~1.9x is the ceiling for single-pass 16→8 bit delta encoding without entropy coding. ECG shows a bimodal shift distribution — slow baseline at shift=0, QRS spikes at shift=7 — confirming the per-block adaptation is working.
+About 1.9x is the ceiling for this approach since you are going from 16-bit samples down to 8-bit deltas. Adding entropy coding (Rice/Golomb) on top of the deltas would push this further.
 
 ## Usage
 
-Edit `MCSIGPACK_CHANNEL_LIST` in `include/mcsigpack.h`:
+Define your channels in `mcsigpack.h`:
 
 ```c
 #define MCSIGPACK_CHANNEL_LIST       \
@@ -35,13 +44,15 @@ Edit `MCSIGPACK_CHANNEL_LIST` in `include/mcsigpack.h`:
     X(MCSIGPACK_CH_EEG2, 1, 250, 1) \
     X(MCSIGPACK_CH_ECG,  2, 250, 1) \
     X(MCSIGPACK_CH_IMU,  3,  20, 3)
+//   enum name, wire ID, Hz, axes
 ```
 
-Then initialise and feed samples:
+Then initialise and push samples:
 
 ```c
 static void my_output(const mcsigpack_packet_t *pkt, void *ud) {
-    /* forward to BLE queue, e.g. k_msgq_put(out_q, pkt, K_NO_WAIT) */
+    // forward to your BLE queue
+    // on Zephyr: k_msgq_put(out_q, pkt, K_NO_WAIT);
 }
 
 mcsigpack_ctx_t ctx;
@@ -51,11 +62,11 @@ mcsigpack_sample_t s = { .channel = MCSIGPACK_CH_ECG, .values = { raw_sample } }
 mcsigpack_push_sample(&ctx, &s);
 ```
 
-Call `mcsigpack_flush()` on shutdown or sensor dropout to emit whatever is buffered.
+Call `mcsigpack_flush()` on shutdown or if a sensor drops out.
 
 ## Zephyr integration
 
-Add to your firmware's `west.yml`:
+Add to your `west.yml`:
 
 ```yaml
 - name: mcsigpack
@@ -70,7 +81,7 @@ Enable in `prj.conf`:
 CONFIG_MCSIGPACK=y
 ```
 
-Link in your app's `CMakeLists.txt`:
+Link in your app `CMakeLists.txt`:
 
 ```cmake
 target_link_libraries(app PRIVATE mcsigpack)
@@ -78,7 +89,7 @@ target_link_libraries(app PRIVATE mcsigpack)
 
 ## Testing
 
-Requires a C99 compiler with AddressSanitizer. No other dependencies for the tests.
+Requires a C99 compiler. No other dependencies.
 
 ```
 make test
