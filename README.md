@@ -98,6 +98,57 @@ Link in your app `CMakeLists.txt`:
 target_link_libraries(app PRIVATE mcsigpack)
 ```
 
+Example Zephyr shim:
+
+```c
+// app/src/mcsigpack_zephyr.c  — lives in YOUR app, not the library
+
+#include <zephyr/kernel.h>
+#include "mcsigpack.h"
+
+// These are yours to define — stack size, priority, queue depth
+#define STACK_SIZE  2048
+#define PRIORITY    5
+#define QUEUE_DEPTH 16
+
+K_THREAD_STACK_DEFINE(mcsigpack_stack, STACK_SIZE);
+K_MSGQ_DEFINE(mcsigpack_out_q, sizeof(mcsigpack_packet_t), QUEUE_DEPTH, 4);
+
+static struct k_thread mcsigpack_thread_data;
+static mcsigpack_ctx_t mcsigpack_ctx;
+
+static void output_cb(const mcsigpack_packet_t *pkt, void *ud)
+{
+    // non-blocking put — drops if queue is full, which is the right
+    // behaviour on a sensor device rather than blocking the encoder
+    k_msgq_put(&mcsigpack_out_q, pkt, K_NO_WAIT);
+}
+
+static void mcsigpack_thread(void *p1, void *p2, void *p3)
+{
+    // your sensor sample arrives via a separate input queue
+    struct k_msgq *in_q = (struct k_msgq *)p1;
+    mcsigpack_sample_t sample;
+
+    while (1) {
+        k_msgq_get(in_q, &sample, K_FOREVER);
+        mcsigpack_push_sample(&mcsigpack_ctx, &sample);
+    }
+}
+
+void mcsigpack_zephyr_init(struct k_msgq *in_q)
+{
+    mcsigpack_init(&mcsigpack_ctx, output_cb, NULL);
+
+    k_thread_create(&mcsigpack_thread_data, mcsigpack_stack,
+                    K_THREAD_STACK_SIZEOF(mcsigpack_stack),
+                    mcsigpack_thread, in_q, NULL, NULL,
+                    PRIORITY, 0, K_NO_WAIT);
+
+    k_thread_name_set(&mcsigpack_thread_data, "mcsigpack");
+}
+```
+
 ## Testing
 
 Requires a C99 compiler. No other dependencies.
