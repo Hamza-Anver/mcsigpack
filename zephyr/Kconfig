@@ -1,4 +1,4 @@
-config SIGPACK
+config CONFIG_SIGPACK
     bool "mcsigpack biosignal compression library"
     help
       Multichannel delta compression for BLE biosignal streaming.
